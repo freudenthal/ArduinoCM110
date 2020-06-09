@@ -4,6 +4,7 @@
 #include "Arduino.h"
 
 #define SPCMMonochromatorQueueCount 8
+#define SPCMMonochromaotrReplyDataMaxCount 4
 
 class SPCMMonochromator
 {
@@ -20,7 +21,7 @@ class SPCMMonochromator
 			Query,
 			Reset,
 			Scan,
-			Select,
+			Grating,
 			StepSize,
 			Speed,
 			Step,
@@ -32,6 +33,7 @@ class SPCMMonochromator
 			None,
 			uInt8,
 			uInt16,
+			uInt24,
 			uInt32,
 		};
 		enum class UnitsType : uint8_t
@@ -46,7 +48,7 @@ class SPCMMonochromator
 			NegPosScan = 4,
 			TooSmallLarge = 5,
 			ActionRequiredNot = 6,
-			AcceptedNot = 7
+			AcceptedNot = 7,
 		};
 		enum class QueryType : uint8_t
 		{
@@ -59,8 +61,8 @@ class SPCMMonochromator
 			SizeByte = 6,
 			GratingCount = 13,
 			Units = 14,
-			Serial = 19
-		}
+			Serial = 19,
+		};
 		enum class ModeType : uint8_t
 		{
 			Inactive,
@@ -99,7 +101,9 @@ class SPCMMonochromator
 		void SetRTSPin(uint8_t RTSPin);
 		void SetReadCTSFunction(PinReader CTSReadFunction);
 		void SetWriteRTSFunction(PinWriter RTSSetFunction);
-		void SendSetWavelength(float Wavelength);
+		void SendSetUnits(UnitsType UnitsToSet);
+		void SendSetGrating(uint8_t Grating);
+		void SendSetWavelength(int32_t Wavelength);
 		void SendGetWavelength();
 		void SendGetGrooves();
 		void SendGetBlaze();
@@ -113,7 +117,16 @@ class SPCMMonochromator
 		bool IsBusy();
 		void Check();
 		void Begin();
-		float GetCurrentWavelength();
+		void Reset();
+		UnitsType GetUnits();
+		uint16_t GetSerial();
+		uint16_t GetWavelength();
+		uint16_t GetScanSpeed();
+		uint8_t GetGratingCount();
+		uint16_t GetGratingGrooves();
+		uint16_t GetGratingBlaze();
+		uint8_t GetGrating();
+		void SetVerbose(bool VerboseToSet);
 	private:
 		void CheckCommandQueue();
 		void Enqueue(CommandType Command);
@@ -128,6 +141,7 @@ class SPCMMonochromator
 		void CommandQueuePut(CommandStruct* CommandPointer, uint32_t Parameter);
 		bool CommandQueuePullToCurrentCommand();
 		void UpdateCurrentCommandVariables();
+		void ChangeModeForCurrentCommand();
 		void CheckForCommandReply();
 		void CheckForParameterReply();
 		void ParseReplyData();
@@ -137,6 +151,9 @@ class SPCMMonochromator
 		void CheckForCompleted();
 		void WaitToSendEcho();
 		void SendCommandParameter();
+		bool ReadCTSPin();
+		void WriteRTSPin(bool Setting);
+		bool RTSHandshake(bool StartEndHandshake);
 		static const CommandStruct CommandLibrary[];
 		static const uint8_t CompeletedByte;
 		static const uint32_t ResetCompleteTime;
@@ -149,6 +166,9 @@ class SPCMMonochromator
 		CommandStruct* CurrentCommand;
 		PinWriter RTSWrite;
 		PinReader CTSRead;
+		UnitsType Units;
+		bool Verbose;
+		bool IgnoreCTS;
 		bool UseCTSPin;
 		bool UseRTSPin;
 		uint8_t CTSPin;
@@ -156,9 +176,10 @@ class SPCMMonochromator
 		uint32_t CurrentCommandParameter;
 		uint32_t CurrentCommandTimeToComplete;
 		uint32_t LastWipeTime = 0;
+		bool ExpectReply;
 		bool ExpectStatus;
 		uint8_t ReplyByteCount;
-		uint8_t ReplyData[4];
+		uint8_t ReplyData[SPCMMonochromaotrReplyDataMaxCount];
 		uint8_t ReplyByteCountMax;
 		CommandQueueEntry CommandQueue[SPCMMonochromatorQueueCount];
 		uint8_t CommandQueueHead;
