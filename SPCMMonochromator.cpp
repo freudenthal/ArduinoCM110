@@ -2,28 +2,29 @@
 
 const uint8_t SPCMMonochromator::CompeletedByte = 24;
 const uint32_t SPCMMonochromator::ResetCompleteTime = 1000000;
-const uint32_t SPCMMonochromator::CommandReplyTimeMax = 250000;
-const uint32_t SPCMMonochromator::TimeToCompleteDefault = 100000;
+const uint32_t SPCMMonochromator::CommandReplyTimeMax = 500000;
+const uint32_t SPCMMonochromator::TimeToCompleteDefault = 500000;
 const uint8_t SPCMMonochromator::RetryCountMax = 8;
 const uint32_t SPCMMonochromator::WipeInputEvery = 100000;
+const uint32_t SPCMMonochromator::IdleTimeMinimum = 100000;
 const SPCMMonochromator::CommandStruct SPCMMonochromator::CommandLibrary[] =
 {
-	{CommandType::None,0,CommandParameterType::None,false,false,false,0},
-	{CommandType::Calibrate,18,CommandParameterType::uInt16,false,true,false,0},
-	{CommandType::Decrement,1,CommandParameterType::None,false,false,false,1000000},
-	{CommandType::Echo,27,CommandParameterType::None,true,false,false,0},
-	{CommandType::Goto,16,CommandParameterType::uInt16,false,true,false,10000000},
-	{CommandType::Increment,7,CommandParameterType::None,false,false,false,1000000},
-	{CommandType::Order,51,CommandParameterType::uInt8,false,true,false,0},
-	{CommandType::Query,56,CommandParameterType::uInt8,true,true,false,0},
-	{CommandType::Reset,255,CommandParameterType::uInt8,true,false,false,10000000},
-	{CommandType::Scan,12,CommandParameterType::uInt32,false,false,false,0},
-	{CommandType::Grating,26,CommandParameterType::uInt8,false,false,true,0},
-	{CommandType::StepSize,55,CommandParameterType::uInt8,false,false,true,0},
-	{CommandType::Speed,13,CommandParameterType::uInt16,false,false,false,0},
-	{CommandType::Step,54,CommandParameterType::None,false,false,true,0},
-	{CommandType::Units,50,CommandParameterType::uInt8,false,false,true,0},
-	{CommandType::Zero,52,CommandParameterType::uInt8,false,false,false,0},
+	{CommandType::None,0,CommandParameterType::None,false,0},
+	{CommandType::Calibrate,18,CommandParameterType::uInt16,false,0},
+	{CommandType::Decrement,1,CommandParameterType::None,false,1000000},
+	{CommandType::Echo,27,CommandParameterType::None,true,0},
+	{CommandType::Goto,16,CommandParameterType::uInt16,false,10000000},
+	{CommandType::Increment,7,CommandParameterType::None,false,1000000},
+	{CommandType::Order,51,CommandParameterType::uInt8,false,0},
+	{CommandType::Query,56,CommandParameterType::uInt8,true,0},
+	{CommandType::Reset,255,CommandParameterType::uInt8,true,10000000},
+	{CommandType::Scan,12,CommandParameterType::uInt32,false,0},
+	{CommandType::Grating,26,CommandParameterType::uInt8,false,0},
+	{CommandType::StepSize,55,CommandParameterType::uInt8,false,0},
+	{CommandType::Speed,13,CommandParameterType::uInt16,false,0},
+	{CommandType::Step,54,CommandParameterType::None,false,0},
+	{CommandType::Units,50,CommandParameterType::uInt8,false,1000000},
+	{CommandType::Zero,52,CommandParameterType::uInt8,false,0},
 };
 SPCMMonochromator::SPCMMonochromator(HardwareSerial *serial)
 {
@@ -66,7 +67,22 @@ SPCMMonochromator::SPCMMonochromator(HardwareSerial *serial)
 	Verbose = false;
 	ExpectReply = false;
 	ExpectStatus = false;
+	IdleTimePassed = false;
+	IdleStartTime = 0;
+	Initialized = false;
 	Mode = ModeType::Inactive;
+}
+void SPCMMonochromator::CheckInitialized()
+{
+	if (!Initialized)
+	{
+		if (Verbose)
+		{
+			Serial.print("<MONO>(Start)\n");
+			Serial.flush();
+		}
+		Begin();
+	}
 }
 void SPCMMonochromator::SetCTSPin(uint8_t CTSPinToSet)
 {
@@ -110,38 +126,47 @@ void SPCMMonochromator::SetWriteRTSFunction(PinWriter RTSSetFunction)
 }
 void SPCMMonochromator::SendGetWavelength()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Position));
 }
 void SPCMMonochromator::SendGetGrooves()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Grooves));
 }
 void SPCMMonochromator::SendGetBlaze()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Blaze));
 }
 void SPCMMonochromator::SendGetGrating()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Grating));
 }
 void SPCMMonochromator::SendGetSpeed()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Speed));
 }
 void SPCMMonochromator::SendGetSize()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::SizeByte));
 }
 void SPCMMonochromator::SendGetGratingCount()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::GratingCount));
 }
 void SPCMMonochromator::SendGetUnits()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Units));
 }
 void SPCMMonochromator::SendGetSerial()
 {
+	CheckInitialized();
 	Enqueue(CommandType::Query,static_cast<uint8_t>(QueryType::Serial));
 }
 void SPCMMonochromator::Reset()
@@ -154,6 +179,7 @@ void SPCMMonochromator::Reset()
 }
 void SPCMMonochromator::Begin()
 {
+	Initialized = true;
 	ClearCommandQueue();
 	Enqueue(CommandType::Echo);
 	SendGetWavelength();
@@ -166,7 +192,7 @@ void SPCMMonochromator::Begin()
 	SendGetSerial();
 	if (Mode == ModeType::Inactive)
 	{
-		Mode = ModeType::Idle;
+		ModeTransitionToIdle();
 	}
 }
 void SPCMMonochromator::SetRecievedCallback(FinishedListener Finished)
@@ -175,15 +201,18 @@ void SPCMMonochromator::SetRecievedCallback(FinishedListener Finished)
 }
 void SPCMMonochromator::SendSetUnits(UnitsType UnitsToSet)
 {
+	CheckInitialized();
 	Enqueue(CommandType::Units,static_cast<uint8_t>(UnitsToSet));
 }
 void SPCMMonochromator::SendSetWavelength(int32_t Wavelength)
 {
+	CheckInitialized();
 	uint32_t WavelengthToSend = (uint32_t)(Wavelength);
 	Enqueue(CommandType::Goto,WavelengthToSend);
 }
 void SPCMMonochromator::SendSetGrating(uint8_t GratingToSet)
 {
+	CheckInitialized();
 	Enqueue(CommandType::Grating,GratingToSet);
 }
 uint16_t SPCMMonochromator::GetSerial()
@@ -243,7 +272,15 @@ void SPCMMonochromator::Check()
 }
 void SPCMMonochromator::CheckCommandQueue()
 {
-	bool NewCommandPulled = CommandQueuePullToCurrentCommand();
+	bool NewCommandPulled = false;
+	if ( (micros() - IdleStartTime) > IdleTimeMinimum )
+	{
+		IdleTimePassed = true;
+	}
+	if (IdleTimePassed)
+	{
+		NewCommandPulled = CommandQueuePullToCurrentCommand();
+	}
 	if (NewCommandPulled)
 	{
 		if (CurrentCommand != NULL)
@@ -261,21 +298,24 @@ void SPCMMonochromator::CheckCommandQueue()
 			Serial.print("<MONOERROR>(Command in queue is null.)\n");
 		}
 	}
-	if ( (micros() - LastWipeTime) > WipeInputEvery )
+	else
 	{
-		LastWipeTime = micros();
-		if (SerialPort->available())
+		if ( (micros() - LastWipeTime) > WipeInputEvery )
 		{
-			if (Verbose)
+			LastWipeTime = micros();
+			if (SerialPort->available())
 			{
-				uint8_t ByteRead = SerialPort->read();
-				Serial.print("<MONOJ>(");
-				Serial.print(ByteRead);
-				Serial.print(")\n");
-			}
-			else
-			{
-				SerialPort->read();
+				if (Verbose)
+				{
+					uint8_t ByteRead = SerialPort->read();
+					Serial.print("<MONOJ>(");
+					Serial.print(ByteRead);
+					Serial.print(")\n");
+				}
+				else
+				{
+					SerialPort->read();
+				}
 			}
 		}
 	}
@@ -400,6 +440,13 @@ void SPCMMonochromator::UpdateCurrentCommandVariables()
 				break;
 		}
 	}
+	else
+	{
+		ReplyByteCount = 0;
+		ExpectReply = false;
+		ExpectStatus = true;
+		ReplyByteCountMax = 0;
+	}
 }
 void SPCMMonochromator::CheckForParameterReply()
 {
@@ -408,7 +455,7 @@ void SPCMMonochromator::CheckForParameterReply()
 		uint8_t ByteRead = SerialPort->read();
 		if (Verbose)
 		{
-			Serial.print("[MONOPR](");
+			Serial.print("<MONOPR>(");
 			Serial.print(ReplyByteCount);
 			Serial.print(",");
 			Serial.print(ReplyByteCountMax);
@@ -466,6 +513,25 @@ void SPCMMonochromator::ParseReplyData()
 		default:
 			break;
 	}
+	if (Verbose)
+	{
+		Serial.print("<MONOSTAT>(");
+		Serial.print(Wavelength);
+		Serial.print(",");
+		Serial.print(GratingGrooves);
+		Serial.print(",");
+		Serial.print(GratingBlaze);
+		Serial.print(",");
+		Serial.print(ScanSpeed);
+		Serial.print(",");
+		Serial.print(GratingsInstalled);
+		Serial.print(",");
+		Serial.print(static_cast<uint8_t>(Units));
+		Serial.print(",");
+		Serial.print(SerialNumber);
+		Serial.print(")\n");
+		Serial.flush();
+	}
 }
 bool SPCMMonochromator::RTSHandshake(bool StartEndHandshake)
 {
@@ -482,10 +548,10 @@ bool SPCMMonochromator::RTSHandshake(bool StartEndHandshake)
 	bool CTSStatus = false;
 	while (KeepWaiting)
 	{
-		delayMicroseconds(10);
+		delayMicroseconds(50);
 		if (IgnoreCTS)
 		{
-			delayMicroseconds(500);
+			delayMicroseconds(5000);
 			KeepWaiting = false;
 		}
 		else
@@ -516,39 +582,39 @@ void SPCMMonochromator::ModeTransitionToIdle()
 {
 	if (CommandQueueEmpty())
 	{
-		RTSHandshake(false);
 		Busy = false;
 		if (RecievedCallback != NULL)
 		{
 			RecievedCallback(CurrentCommand->Command);
 		}
 	}
+	RTSHandshake(false);
+	IdleTimePassed = false;
+	IdleStartTime = micros();
 	Mode = ModeType::Idle;
 }
 void SPCMMonochromator::CheckForStatus()
 {
 	if (SerialPort->available())
 	{
+		bool ParameterNotAccepted = false;
+		bool ParameterIsAlreadyEqual = false;
 		StatusByte = SerialPort->read();
-		if (Verbose)
-		{
-			Serial.print("[MONOS](");
-			Serial.print(StatusByte);
-			Serial.print(")\n");
-		}
 		if (CurrentCommand->Command == CommandType::Echo)
 		{
 			if (StatusByte != 27)
 			{
 				Serial.print("<MONOERROR>(Echo return unexpected reply ");
-				Serial.print(StatusByte); 
+				Serial.print(StatusByte);
 				Serial.print(".)\n");
 			}
+			ParameterNotAccepted = false;
+			ParameterIsAlreadyEqual = true;
 		}
 		else
 		{
-			bool ParameterNotAccepted = bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::AcceptedNot));
-			bool ParameterIsAlreadyEqual = bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::ActionRequiredNot));
+			ParameterNotAccepted = bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::AcceptedNot));
+			ParameterIsAlreadyEqual = bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::ActionRequiredNot));
 			Units = static_cast<UnitsType>( (uint8_t)(StatusByte & 0x03) );
 			if (ParameterNotAccepted && !ParameterIsAlreadyEqual)
 			{
@@ -569,8 +635,27 @@ void SPCMMonochromator::CheckForStatus()
 			Mode = ModeType::WaitForCompleted;
 			StatusByteReceivedTime = micros();
 		}
+		if (Verbose)
+		{
+			uint8_t Units = StatusByte && 7;
+			Serial.print("<MONOS>(");
+			Serial.print(StatusByte);
+			Serial.print(",");
+			Serial.print(ParameterNotAccepted);
+			Serial.print(",");
+			Serial.print(ParameterIsAlreadyEqual);
+			Serial.print(",");
+			Serial.print(bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::TooSmallLarge)));
+			Serial.print(",");
+			Serial.print(bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::NegPosScan)));
+			Serial.print(",");
+			Serial.print(bitRead(StatusByte,static_cast<uint8_t>(StatusByteMeaning::NegPosOrder)));
+			Serial.print(",");
+			Serial.print(Units);
+			Serial.print(")\n");
+		}
 	}
-	else if ( (micros() - CommandReplyTime) > CommandReplyTimeMax)
+	else if ( (micros() - CommandReplyTime) > CurrentCommandTimeToComplete)
 	{
 		Serial.print("<MONOERROR>(No status byte received.)\n");
 		ModeTransitionToIdle();
@@ -583,7 +668,7 @@ void SPCMMonochromator::CheckForCompleted()
 		uint8_t ByteRead = SerialPort->read();
 		if (Verbose)
 		{
-			Serial.print("[MONOC](");
+			Serial.print("<MONOC>(");
 			Serial.print(ByteRead);
 			Serial.print(")\n");
 		}
@@ -652,11 +737,15 @@ bool SPCMMonochromator::SendCommand(CommandStruct* CommandToSend)
 		SerialPort->write(CurrentCommand->CommandInt);
 		if (Verbose)
 		{
-			Serial.print("[MONOS](");
+			Serial.print("<MONOO>(");
 			Serial.print(CurrentCommand->CommandInt);
 			Serial.print(")\n");
 		}
 		LastCommandSentTime = micros();
+	}
+	if (CurrentCommand->SendType != CommandParameterType::None)
+	{
+		SendCommandParameter();
 	}
 	return Status;
 }
@@ -666,7 +755,7 @@ void SPCMMonochromator::SendCommandParameter()
 	Converter.uInt32 = CurrentCommandParameter;
 	if (Verbose)
 	{
-		Serial.print("[MONOPA](");
+		Serial.print("<MONOPO>(");
 		Serial.print(CurrentCommandParameter);
 		Serial.print(")\n");
 	}
@@ -685,4 +774,19 @@ void SPCMMonochromator::SendCommandParameter()
 			Serial.print("<MONOERROR>(Attempt to send invalid parameter.)\n");
 			break;
 	}
+	switch (CurrentCommand->Command)
+	{
+		case (CommandType::Goto):
+			Wavelength = (uint16_t)CurrentCommandParameter;
+			break;
+		case (CommandType::Grating):
+			GratingCurrent = (uint8_t)CurrentCommandParameter;
+			break;
+		case (CommandType::Units):
+			Units = static_cast<UnitsType>(CurrentCommandParameter);
+			break;
+		default:
+			break;
+	}
+	CommandReplyTime = micros();
 }

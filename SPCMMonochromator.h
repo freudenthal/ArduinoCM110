@@ -84,8 +84,6 @@ class SPCMMonochromator
 			uint8_t CommandInt;
 			CommandParameterType SendType;
 			bool HasAlternateReply;
-			bool ResetAfter;
-			bool StartContinuousMovement;
 			uint32_t TimeToComplete;
 		};
 		struct CommandQueueEntry
@@ -152,6 +150,7 @@ class SPCMMonochromator
 		void WaitToSendEcho();
 		void SendCommandParameter();
 		bool ReadCTSPin();
+		void CheckInitialized();
 		void WriteRTSPin(bool Setting);
 		bool RTSHandshake(bool StartEndHandshake);
 		static const CommandStruct CommandLibrary[];
@@ -161,6 +160,7 @@ class SPCMMonochromator
 		static const uint32_t TimeToCompleteDefault;
 		static const uint8_t RetryCountMax;
 		static const uint32_t WipeInputEvery;
+		static const uint32_t IdleTimeMinimum;
 		HardwareSerial* SerialPort;
 		FinishedListener RecievedCallback;
 		CommandStruct* CurrentCommand;
@@ -175,7 +175,9 @@ class SPCMMonochromator
 		uint8_t RTSPin;
 		uint32_t CurrentCommandParameter;
 		uint32_t CurrentCommandTimeToComplete;
-		uint32_t LastWipeTime = 0;
+		uint32_t LastWipeTime;
+		uint32_t IdleStartTime;
+		bool IdleTimePassed;
 		bool ExpectReply;
 		bool ExpectStatus;
 		uint8_t ReplyByteCount;
@@ -188,6 +190,7 @@ class SPCMMonochromator
 		uint8_t StatusByte;
 		ModeType Mode;
 		bool Busy;
+		bool Initialized;
 		uint8_t GratingCurrent;
 		uint32_t LastCommandSentTime;
 		uint32_t CommandReplyTime;
