@@ -194,6 +194,7 @@ class SPCMMonochromator
 		uint8_t GratingCurrent;
 		uint32_t LastCommandSentTime;
 		uint32_t CommandReplyTime;
+		uint32_t CurrentCommandReplyTime;
 		uint32_t StatusByteReceivedTime;
 		uint32_t ResetTime;
 		uint8_t ResetWaitCount;

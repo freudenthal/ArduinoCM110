@@ -1,7 +1,7 @@
 #include "SPCMMonochromator.h"
 
 const uint8_t SPCMMonochromator::CompeletedByte = 24;
-const uint32_t SPCMMonochromator::ResetCompleteTime = 1000000;
+const uint32_t SPCMMonochromator::ResetCompleteTime = 5000000;
 const uint32_t SPCMMonochromator::CommandReplyTimeMax = 500000;
 const uint32_t SPCMMonochromator::TimeToCompleteDefault = 500000;
 const uint8_t SPCMMonochromator::RetryCountMax = 8;
@@ -12,12 +12,12 @@ const SPCMMonochromator::CommandStruct SPCMMonochromator::CommandLibrary[] =
 	{CommandType::None,0,CommandParameterType::None,false,0},
 	{CommandType::Calibrate,18,CommandParameterType::uInt16,false,0},
 	{CommandType::Decrement,1,CommandParameterType::None,false,1000000},
-	{CommandType::Echo,27,CommandParameterType::None,true,0},
+	{CommandType::Echo,27,CommandParameterType::None,true,1000000},
 	{CommandType::Goto,16,CommandParameterType::uInt16,false,10000000},
 	{CommandType::Increment,7,CommandParameterType::None,false,1000000},
 	{CommandType::Order,51,CommandParameterType::uInt8,false,0},
 	{CommandType::Query,56,CommandParameterType::uInt8,true,0},
-	{CommandType::Reset,255,CommandParameterType::uInt8,true,10000000},
+	{CommandType::Reset,255,CommandParameterType::None,true,10000000},
 	{CommandType::Scan,12,CommandParameterType::uInt32,false,0},
 	{CommandType::Grating,26,CommandParameterType::uInt8,false,0},
 	{CommandType::StepSize,55,CommandParameterType::uInt8,false,0},
@@ -322,7 +322,12 @@ void SPCMMonochromator::CheckCommandQueue()
 }
 void SPCMMonochromator::ChangeModeForCurrentCommand()
 {
-	if (ExpectReply)
+	if (CurrentCommand->Command == CommandType::Reset)
+	{
+		ResetTime = micros();
+		Mode = ModeType::WaitToSendEcho;
+	}
+	else if (ExpectReply)
 	{
 		Mode = ModeType::WaitForParameterReply;
 	}
@@ -472,7 +477,7 @@ void SPCMMonochromator::CheckForParameterReply()
 		}
 		CommandReplyTime = micros();
 	}
-	else if ( (micros() - CommandReplyTime) > CommandReplyTimeMax)
+	else if ( (micros() - CommandReplyTime) > CurrentCommandTimeToComplete)
 	{
 		Serial.print("<MONOERROR>(No command reply.)\n");
 		ModeTransitionToIdle();
@@ -625,11 +630,6 @@ void SPCMMonochromator::CheckForStatus()
 		{
 			ModeTransitionToIdle();
 		}
-		else if (CurrentCommand->Command == CommandType::Reset)
-		{
-			ResetTime = micros();
-			Mode = ModeType::WaitToSendEcho;
-		}
 		else
 		{
 			Mode = ModeType::WaitForCompleted;
@@ -689,9 +689,12 @@ void SPCMMonochromator::WaitToSendEcho()
 {
 	if ( (micros() - ResetTime) > ResetCompleteTime)
 	{
-		CommandStruct* EchoCommand = const_cast<CommandStruct*>(&CommandLibrary[static_cast<uint8_t>(CommandType::Echo)]);
-		SendCommand(EchoCommand);
-		Mode = ModeType::WaitForStatus;
+		CurrentCommand = const_cast<CommandStruct*>(&CommandLibrary[static_cast<uint8_t>(CommandType::Echo)]);
+		CurrentCommandParameter = 0;
+		UpdateCurrentCommandVariables();
+		SendCommand(CurrentCommand);
+		ChangeModeForCurrentCommand();
+		//Mode = ModeType::WaitForStatus;
 	}
 }
 bool SPCMMonochromator::IsBusy()
@@ -747,6 +750,7 @@ bool SPCMMonochromator::SendCommand(CommandStruct* CommandToSend)
 	{
 		SendCommandParameter();
 	}
+	CommandReplyTime = micros();
 	return Status;
 }
 void SPCMMonochromator::SendCommandParameter()
@@ -788,5 +792,4 @@ void SPCMMonochromator::SendCommandParameter()
 		default:
 			break;
 	}
-	CommandReplyTime = micros();
 }
