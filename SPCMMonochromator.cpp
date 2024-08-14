@@ -590,7 +590,7 @@ void SPCMMonochromator::ModeTransitionToIdle()
 		Busy = false;
 		if (RecievedCallback != NULL)
 		{
-			RecievedCallback(CurrentCommand->Command);
+			RecievedCallback(CurrentCommand->Command, CurrentCommandParameter);
 		}
 	}
 	RTSHandshake(false);

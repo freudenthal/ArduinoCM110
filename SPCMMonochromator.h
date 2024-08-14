@@ -91,7 +91,7 @@ class SPCMMonochromator
 			CommandStruct* Command;
 			uint32_t Parameter;
 		};
-		typedef void ( *FinishedListener )(SPCMMonochromator::CommandType Command);
+		typedef void ( *FinishedListener )(SPCMMonochromator::CommandType Command, uint32_t Parameter);
 		typedef void ( *PinWriter )(bool OutputHighLow);
 		typedef bool ( *PinReader )(void);
 		SPCMMonochromator(HardwareSerial* serial); //Invoke with SPCMMonochromator(&SerialN);
