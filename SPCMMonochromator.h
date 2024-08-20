@@ -125,6 +125,8 @@ class SPCMMonochromator
 		uint16_t GetGratingBlaze();
 		uint8_t GetGrating();
 		void SetVerbose(bool VerboseToSet);
+		void SetInvertRTS(bool InvertRTSToSet);
+		void SetInvertCTS(bool InvertCTSToSet);
 	private:
 		void CheckCommandQueue();
 		void Enqueue(CommandType Command);
@@ -171,6 +173,8 @@ class SPCMMonochromator
 		bool IgnoreCTS;
 		bool UseCTSPin;
 		bool UseRTSPin;
+		bool InvertRTS;
+		bool InvertCTS;
 		uint8_t CTSPin;
 		uint8_t RTSPin;
 		uint32_t CurrentCommandParameter;

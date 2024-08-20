@@ -61,6 +61,8 @@ SPCMMonochromator::SPCMMonochromator(HardwareSerial *serial)
 	UseRTSPin = false;
 	CTSPin = 0;
 	RTSPin = 0;
+	InvertRTS = false;
+	InvertCTS = false;
 	IgnoreCTS = true;
 	RTSWrite = NULL;
 	CTSRead = NULL;
@@ -117,6 +119,14 @@ void SPCMMonochromator::SetReadCTSFunction(PinReader CTSReadFunction)
 void SPCMMonochromator::SetVerbose(bool VerboseToSet)
 {
 	Verbose = VerboseToSet;
+}
+void SPCMMonochromator::SetInvertRTS(bool InvertRTSToSet)
+{
+	InvertRTS = InvertRTSToSet;
+}
+void SPCMMonochromator::SetInvertCTS(bool InvertCTSToSet)
+{
+	InvertCTS = InvertCTSToSet;
 }
 void SPCMMonochromator::SetWriteRTSFunction(PinWriter RTSSetFunction)
 {
@@ -542,11 +552,25 @@ bool SPCMMonochromator::RTSHandshake(bool StartEndHandshake)
 {
 	if (RTSWrite == NULL)
 	{
-		digitalWrite(RTSPin, StartEndHandshake);
+		if (InvertRTS)
+		{
+			digitalWrite(RTSPin, !StartEndHandshake);
+		}
+		else
+		{
+			digitalWrite(RTSPin, StartEndHandshake);
+		}
 	}
 	else
 	{
-		RTSWrite(StartEndHandshake);
+		if (InvertRTS)
+		{
+			digitalWrite(RTSPin, !StartEndHandshake);
+		}
+		else
+		{
+			RTSWrite(StartEndHandshake);
+		}
 	}
 	uint32_t RTSStart = micros();
 	bool KeepWaiting = true;
@@ -563,7 +587,14 @@ bool SPCMMonochromator::RTSHandshake(bool StartEndHandshake)
 		{
 			if (CTSRead == NULL)
 			{
-				CTSStatus = digitalRead(CTSPin);
+				if (InvertCTS)
+				{
+					CTSStatus = !digitalRead(CTSPin);
+				}
+				else
+				{
+					CTSStatus = digitalRead(CTSPin);
+				}
 			}
 			else
 			{
