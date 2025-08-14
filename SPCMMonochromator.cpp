@@ -200,6 +200,7 @@ void SPCMMonochromator::Begin()
 	SendGetGratingCount();
 	SendGetUnits();
 	SendGetSerial();
+	//SendSetUnits(UnitsType::Nanometers);
 	if (Mode == ModeType::Inactive)
 	{
 		ModeTransitionToIdle();
